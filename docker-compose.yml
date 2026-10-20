@@ -1,0 +1,36 @@
+# `docker compose up --build` starts Postgres + the API on http://localhost:3000
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orders
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Creates the separate orders_test database used by `npm test`
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:postgres@db:5432/orders
+      JWT_SECRET: a4133cbadd866722215130630bf3cb3fbc71405a6b8a2e92e663b5f109b40233
+      JWT_EXPIRES_IN: 1h
+      ORDER_RATE_LIMIT_MAX: 10
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
